@@ -1,0 +1,135 @@
+
+<style>
+  .wrap { max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
+  .card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.5rem; }
+  .label { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 6px; }
+  input[type=text] { width: 100%; box-sizing: border-box; margin-bottom: 1rem; }
+  .result-box { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 1rem 1.25rem; margin-top: 1.25rem; display: none; }
+  .code-display { font-family: var(--font-mono); font-size: 22px; font-weight: 500; letter-spacing: 0.12em; color: var(--color-text-primary); margin: 0.5rem 0 0.25rem; }
+  .copy-btn { font-size: 13px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 4px 12px; background: transparent; color: var(--color-text-secondary); cursor: pointer; margin-top: 8px; }
+  .copy-btn:hover { background: var(--color-background-secondary); }
+  .note { font-size: 12px; color: var(--color-text-tertiary); margin-top: 1rem; line-height: 1.6; }
+  .alert { font-size: 13px; border-radius: var(--border-radius-md); padding: 8px 12px; margin-bottom: 1rem; display: none; }
+  .alert-danger { color: var(--color-text-danger); background: var(--color-background-danger); }
+  .alert-warn { color: var(--color-text-warning); background: var(--color-background-warning); }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--color-background-success); color: var(--color-text-success); margin-left: 8px; vertical-align: middle; }
+  h2 { font-size: 16px; font-weight: 500; margin: 0 0 0.25rem; }
+  p.sub { font-size: 13px; color: var(--color-text-secondary); margin: 0 0 1.5rem; }
+  .divider { border: none; border-top: 0.5px solid var(--color-border-tertiary); margin: 1.25rem 0; }
+</style>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Generador de código anónimo</h2>
+    <p class="sub">Proyecto FCIF 2026 — Tecnología Médica UVM</p>
+
+    <div class="label">RUT (sin puntos, con guión)</div>
+    <input type="text" id="rut" placeholder="Ej: 12345678-9" maxlength="12" autocomplete="off" />
+
+    <div class="alert alert-danger" id="err-formato">Formato inválido. Usa el formato 12345678-9</div>
+    <div class="alert alert-danger" id="err-dv">El dígito verificador no corresponde a este RUT. Revisa que lo hayas ingresado correctamente.</div>
+
+    <button onclick="generar()" style="width:100%">Generar mi código</button>
+
+    <div class="result-box" id="result">
+      <div class="label">Tu código para el cuestionario <span class="tag">listo</span></div>
+      <div class="code-display" id="code">—</div>
+      <div style="font-size:12px; color: var(--color-text-tertiary);">Cópialo y úsalo en ambas mediciones (pre-test y post-test).</div>
+      <button class="copy-btn" onclick="copiar()">Copiar código</button>
+      <hr class="divider">
+      <div style="font-size:12px; color: var(--color-text-tertiary); line-height:1.6;">
+        Tu RUT <strong>no se almacena ni se envía</strong> a ningún servidor.<br>
+        Este código es irreversible: nadie puede recuperar tu RUT a partir de él.
+      </div>
+    </div>
+
+    <p class="note">
+      El código se genera mediante SHA-256, una función criptográfica estándar.
+      El proceso ocurre completamente en tu navegador.
+      Guarda tu código antes de cerrar esta página.
+    </p>
+  </div>
+</div>
+
+<script>
+function limpiarRut(rut) {
+  return rut.replace(/\./g, '').trim().toUpperCase();
+}
+
+function validarFormato(rut) {
+  return /^\d{7,8}-[\dKk]$/.test(rut);
+}
+
+function calcularDV(cuerpo) {
+  const digits = String(cuerpo).split('').reverse();
+  const serie = [2, 3, 4, 5, 6, 7];
+  let suma = 0;
+  digits.forEach((d, i) => {
+    suma += parseInt(d) * serie[i % 6];
+  });
+  const resto = suma % 11;
+  const dv = 11 - resto;
+  if (dv === 11) return '0';
+  if (dv === 10) return 'K';
+  return String(dv);
+}
+
+function validarDV(rut) {
+  const partes = rut.split('-');
+  const cuerpo = partes[0];
+  const dvIngresado = partes[1].toUpperCase();
+  const dvCalculado = calcularDV(cuerpo);
+  return dvIngresado === dvCalculado;
+}
+
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function formatearCodigo(hex) {
+  const parte = hex.slice(0, 12).toUpperCase();
+  return parte.slice(0,4) + '-' + parte.slice(4,8) + '-' + parte.slice(8,12);
+}
+
+function ocultarAlertas() {
+  document.getElementById('err-formato').style.display = 'none';
+  document.getElementById('err-dv').style.display = 'none';
+}
+
+async function generar() {
+  ocultarAlertas();
+  document.getElementById('result').style.display = 'none';
+
+  const rut = limpiarRut(document.getElementById('rut').value);
+
+  if (!validarFormato(rut)) {
+    document.getElementById('err-formato').style.display = 'block';
+    return;
+  }
+
+  if (!validarDV(rut)) {
+    document.getElementById('err-dv').style.display = 'block';
+    return;
+  }
+
+  const salt = 'FCIF2026-TM-UVM';
+  const hash = await sha256(salt + rut);
+  const codigo = formatearCodigo(hash);
+  document.getElementById('code').textContent = codigo;
+  document.getElementById('result').style.display = 'block';
+}
+
+function copiar() {
+  const codigo = document.getElementById('code').textContent;
+  navigator.clipboard.writeText(codigo).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copiado';
+    setTimeout(() => btn.textContent = 'Copiar código', 2000);
+  });
+}
+
+document.getElementById('rut').addEventListener('keydown', e => {
+  if (e.key === 'Enter') generar();
+});
+</script>
