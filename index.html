@@ -67,7 +67,15 @@ button{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:poin
 
     <section class="form">
       <label for="rut">RUT</label>
-      <input id="rut" type="text" autocomplete="off" maxlength="12" placeholder="Ej.: 12345678-9">
+      <input   id="rut"
+  name="rut_participante"
+  type="text"
+  autocomplete="off"
+  autocorrect="off"
+  autocapitalize="off"
+  spellcheck="false"
+  maxlength="12"
+  placeholder="Ej.: 12345678-9">
       <div class="note">Con guion y dígito verificador.</div>
 
       <div id="err-formato" class="alert" hidden>Formato inválido. Usa el formato 12345678-9.</div>
